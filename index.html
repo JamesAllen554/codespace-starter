@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MLB Statcast Ballpark Home Run Explorer</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚾</text></svg>">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            mlb: {
+              navy: '#041e42',
+              red: '#bf0d3e',
+              blue: '#002d72',
+              card: '#0f172a',
+              cardborder: '#1e293b'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Chart.js 4 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0b1120;
+      color: #e2e8f0;
+    }
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-card {
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(51, 65, 85, 0.6);
+    }
+    .glass-card-hover:hover {
+      border-color: rgba(96, 165, 250, 0.5);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(59, 130, 246, 0.2);
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-blue-600 selection:text-white">
+
+  <!-- Navigation Bar -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-red-600 flex items-center justify-center shadow-lg shadow-blue-500/20 text-xl font-bold">
+          ⚾
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-lg font-bold text-white tracking-tight">MLB Statcast Ballpark Explorer</h1>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">Statcast 2018–2026</span>
+          </div>
+          <p class="text-xs text-slate-400">Dimensions, Fence Factors &amp; Home Run Launch Metrics</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-3">
+        <a href="https://baseballsavant.mlb.com/leaderboard/statcast-park-factors?type=dimensions&year=2026" target="_blank" rel="noopener noreferrer" 
+           class="inline-flex items-center space-x-2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-2 rounded-lg border border-slate-700 transition">
+          <span>Source: Baseball Savant</span>
+          <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero & Metric Stats Bar -->
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-2 w-full">
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div class="glass-card rounded-xl p-3 border-l-4 border-l-blue-500">
+        <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Ballparks</div>
+        <div class="text-xl font-bold text-white mt-1">30 MLB Parks</div>
+        <div class="text-[11px] text-blue-400 mt-0.5">All 30 Active Venues</div>
+      </div>
+      <div class="glass-card rounded-xl p-3 border-l-4 border-l-purple-500">
+        <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Seasons Included</div>
+        <div class="text-xl font-bold text-white mt-1">2018 – 2026</div>
+        <div class="text-[11px] text-purple-400 mt-0.5">810 Dimension Profiles</div>
+      </div>
+      <div class="glass-card rounded-xl p-3 border-l-4 border-l-emerald-500">
+        <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Home Runs Analyzed</div>
+        <div class="text-xl font-bold text-white mt-1">3,500+ HRs</div>
+        <div class="text-[11px] text-emerald-400 mt-0.5">Individual Statcast Events</div>
+      </div>
+      <div class="glass-card rounded-xl p-3 border-l-4 border-l-red-500">
+        <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Most HR-Friendly</div>
+        <div class="text-xl font-bold text-red-400 mt-1">Great American</div>
+        <div class="text-[11px] text-slate-400 mt-0.5">HR Index: <span class="text-red-400 font-bold">113-125</span></div>
+      </div>
+      <div class="glass-card rounded-xl p-3 border-l-4 border-l-amber-500">
+        <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Toughest For HRs</div>
+        <div class="text-xl font-bold text-amber-400 mt-1">Comerica Park</div>
+        <div class="text-[11px] text-slate-400 mt-0.5">HR Index: <span class="text-amber-400 font-bold">75-82</span></div>
+      </div>
+      <div class="glass-card rounded-xl p-3 border-l-4 border-l-indigo-500">
+        <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Average HR Distance</div>
+        <div class="text-xl font-bold text-indigo-400 mt-1">398.2 ft</div>
+        <div class="text-[11px] text-slate-400 mt-0.5">Exit Velo: <span class="text-slate-300 font-semibold">103.8 mph</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main View Navigation Tabs -->
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 w-full">
+    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-3">
+      <div class="flex space-x-2 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
+        <button id="tab-btn-macro" onclick="switchView('macro')" 
+                class="px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center space-x-2 bg-blue-600 text-white shadow-lg shadow-blue-600/30">
+          <span>🏟️ Ballpark Dimensions vs HR Factor</span>
+          <span class="text-xs px-2 py-0.5 bg-blue-700/60 rounded-full font-mono">810 Pts</span>
+        </button>
+        <button id="tab-btn-micro" onclick="switchView('micro')" 
+                class="px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-slate-800">
+          <span>⚡ 3,500+ Individual Statcast HRs</span>
+          <span class="text-xs px-2 py-0.5 bg-slate-800 rounded-full font-mono">3,500 Pts</span>
+        </button>
+        <button id="tab-btn-rankings" onclick="switchView('rankings')" 
+                class="px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-slate-800">
+          <span>📊 Stadium Rankings</span>
+        </button>
+        <button id="tab-btn-table" onclick="switchView('table')" 
+                class="px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-slate-800">
+          <span>📋 Data Table</span>
+        </button>
+      </div>
+
+      <div class="flex items-center space-x-2 text-xs text-slate-400">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span>Interactive Statcast Engine</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIEW 1: MACRO SCATTER PLOT (Dimensions vs Home Run Factor) -->
+  <main id="view-macro" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6">
+    
+    <!-- Control Toolbar -->
+    <div class="glass-card rounded-2xl p-5 border border-slate-800">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800/80 mb-4">
+        <h2 class="text-base font-bold text-white flex items-center space-x-2">
+          <span>Outfield Dimensions vs Home Run Park Factor</span>
+          <span class="text-xs font-normal text-slate-400">(Explore how fence distance, wall heights, and field dimensions directly govern MLB home run rates)</span>
+        </h2>
+        <div class="text-xs text-blue-400 font-mono" id="macro-data-count">Showing 30 / 810 data points</div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <!-- X-Axis Selector -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">X-Axis Dimension</label>
+          <select id="macro-x-axis" onchange="updateMacroChart()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="avg_fence_distance" selected>Average Fence Distance (ft)</option>
+            <option value="distance_cf">Center Field Distance (ft)</option>
+            <option value="distance_lf_line">Left Field Line Distance (ft)</option>
+            <option value="distance_rf_line">Right Field Line Distance (ft)</option>
+            <option value="distance_lf_gap">Left-Center Gap Distance (ft)</option>
+            <option value="distance_rf_gap">Right-Center Gap Distance (ft)</option>
+            <option value="distance_deepest">Deepest Outfield Distance (ft)</option>
+            <option value="fence_area">Outfield Fence Area (sq. ft)</option>
+            <option value="avg_fence_height">Average Fence Height (ft)</option>
+            <option value="height_highest">Highest Fence Wall (ft)</option>
+            <option value="elevation">Stadium Elevation (ft)</option>
+          </select>
+        </div>
+
+        <!-- Y-Axis Selector -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Y-Axis Metric</label>
+          <select id="macro-y-axis" onchange="updateMacroChart()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="index_hr" selected>Home Run Factor (100 = Avg)</option>
+            <option value="avg_hr_distance">Average HR Distance (ft)</option>
+            <option value="index_runs">Run Factor (index_runs)</option>
+            <option value="index_hardhit">Hard Hit Factor (index_hardhit)</option>
+            <option value="index_woba">wOBA Factor (index_woba)</option>
+          </select>
+        </div>
+
+        <!-- Year Selector -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Season / Year</label>
+          <select id="macro-year" onchange="updateMacroChart()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="2026" selected>2026 Season (Current Savant)</option>
+            <option value="2025">2025 Season</option>
+            <option value="2024">2024 Season</option>
+            <option value="2023">2023 Season</option>
+            <option value="2022">2022 Season</option>
+            <option value="2021">2021 Season</option>
+            <option value="2020">2020 Season</option>
+            <option value="2019">2019 Season</option>
+            <option value="2018">2018 Season</option>
+            <option value="ALL">All Seasons Combined (270+ Parks)</option>
+          </select>
+        </div>
+
+        <!-- Batter Hand Split -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Batter Handedness</label>
+          <select id="macro-split" onchange="updateMacroChart()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="All" selected>All Batters (Overall)</option>
+            <option value="LHB">Left-Handed Batters (LHB)</option>
+            <option value="RHB">Right-Handed Batters (RHB)</option>
+            <option value="ALL_SPLITS">Include All Split Data Points</option>
+          </select>
+        </div>
+
+        <!-- League Filter -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">League Filter</label>
+          <select id="macro-league" onchange="updateMacroChart()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="ALL" selected>Both Leagues (AL &amp; NL)</option>
+            <option value="AL">American League (AL)</option>
+            <option value="NL">National League (NL)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Quick Toggles -->
+      <div class="flex flex-wrap items-center justify-between gap-3 mt-4 pt-4 border-t border-slate-800/60 text-xs">
+        <div class="flex items-center space-x-6">
+          <label class="inline-flex items-center space-x-2 cursor-pointer">
+            <input type="checkbox" id="macro-show-trend" checked onchange="updateMacroChart()" class="rounded bg-slate-800 border-slate-700 text-blue-600 focus:ring-blue-500 h-4 w-4">
+            <span class="text-slate-300 font-medium">Show Linear Regression Trendline</span>
+          </label>
+          <label class="inline-flex items-center space-x-2 cursor-pointer">
+            <input type="checkbox" id="macro-color-league" onchange="updateMacroChart()" class="rounded bg-slate-800 border-slate-700 text-blue-600 focus:ring-blue-500 h-4 w-4">
+            <span class="text-slate-300 font-medium">Color by League (AL Blue vs NL Red)</span>
+          </label>
+        </div>
+
+        <!-- Ballpark Search / Highlight -->
+        <div class="flex items-center space-x-2 w-full md:w-auto">
+          <span class="text-slate-400">Search Park:</span>
+          <input type="text" id="macro-search" placeholder="e.g. Coors, Fenway, Yankee..." oninput="updateMacroChart()" 
+                 class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:ring-2 focus:ring-blue-500 focus:outline-none w-48">
+        </div>
+      </div>
+    </div>
+
+    <!-- Chart Container & Statistical Summary -->
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      
+      <!-- Chart Canvas (3 Cols) -->
+      <div class="lg:col-span-3 glass-card rounded-2xl p-5 border border-slate-800 relative">
+        <div class="h-[520px] w-full">
+          <canvas id="macroChartCanvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Statistical Side Panel (1 Col) -->
+      <div class="space-y-4">
+        <!-- Regression Metrics Card -->
+        <div class="glass-card rounded-2xl p-5 border border-slate-800">
+          <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
+            <span>Regression Analysis</span>
+            <span class="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono">OLS</span>
+          </div>
+          <div class="space-y-3">
+            <div>
+              <div class="text-xs text-slate-400">Correlation Coefficient (r)</div>
+              <div class="text-2xl font-bold font-mono" id="stat-r">--</div>
+              <div class="text-[11px] text-slate-400 mt-0.5" id="stat-r-desc">Calculating...</div>
+            </div>
+            <div class="pt-2 border-t border-slate-800">
+              <div class="text-xs text-slate-400">Coefficient of Determination (R²)</div>
+              <div class="text-2xl font-bold font-mono text-blue-400" id="stat-r2">--</div>
+              <div class="text-[11px] text-slate-400 mt-0.5" id="stat-r2-desc">Variance explained</div>
+            </div>
+            <div class="pt-2 border-t border-slate-800">
+              <div class="text-xs text-slate-400">Trendline Equation</div>
+              <div class="text-xs font-mono bg-slate-900 p-2 rounded border border-slate-800 text-emerald-400 break-all" id="stat-eq">y = mx + b</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Highlighted Ballpark Details -->
+        <div class="glass-card rounded-2xl p-5 border border-slate-800" id="ballpark-detail-card">
+          <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Selected Park Info</div>
+          <div id="detail-empty" class="text-xs text-slate-400 italic">Hover or click any scatter point in the chart to inspect full ballpark dimensions and park factors.</div>
+          <div id="detail-content" class="hidden space-y-2 text-xs">
+            <div class="flex items-center space-x-2">
+              <span id="detail-dot" class="w-3 h-3 rounded-full bg-blue-500"></span>
+              <span id="detail-name" class="font-bold text-white text-sm"></span>
+            </div>
+            <div class="text-slate-400" id="detail-team-city"></div>
+            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 font-mono text-[11px]">
+              <div>HR Index: <span id="detail-hr" class="text-white font-bold"></span></div>
+              <div>Runs Index: <span id="detail-runs" class="text-white font-bold"></span></div>
+              <div>Avg Fence: <span id="detail-fence" class="text-slate-300"></span></div>
+              <div>Avg HR Dist: <span id="detail-hr-dist" class="text-slate-300"></span></div>
+              <div>CF Distance: <span id="detail-cf" class="text-slate-300"></span></div>
+              <div>Fence Area: <span id="detail-area" class="text-slate-300"></span></div>
+              <div>Max Wall Ht: <span id="detail-wall" class="text-slate-300"></span></div>
+              <div>Elevation: <span id="detail-elev" class="text-slate-300"></span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Baseball Savant Insight Box -->
+        <div class="glass-card rounded-2xl p-4 border border-blue-900/40 bg-blue-950/20 text-xs space-y-2">
+          <div class="font-semibold text-blue-300 flex items-center space-x-1.5">
+            <span>💡 How Statcast Park Factor Works</span>
+          </div>
+          <p class="text-slate-300 leading-relaxed text-[11px]">
+            A Park Factor of <strong class="text-white">100</strong> is MLB average. A score of <strong class="text-emerald-400">115</strong> indicates 15% more home runs than normal, while <strong class="text-amber-400">85</strong> indicates 15% fewer. Shorter fence distances and lower fence heights strongly correlate with higher HR rates.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- VIEW 2: MICRO SCATTER PLOT (3,500+ Individual Statcast Home Runs) -->
+  <main id="view-micro" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6 hidden">
+    
+    <!-- Control Toolbar -->
+    <div class="glass-card rounded-2xl p-5 border border-slate-800">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800/80 mb-4">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center space-x-2">
+            <span>3,500+ Individual Home Runs Batted Ball Distribution</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Explore exit velocities, launch angles, and hit distances of thousands of home runs hit in each MLB stadium.</p>
+        </div>
+        <div class="text-xs text-emerald-400 font-mono" id="micro-data-count">Loading data points...</div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <!-- Stadium Selector -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Filter by Stadium</label>
+          <select id="micro-stadium" onchange="updateMicroChart()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <option value="ALL" selected>All 30 MLB Ballparks (Full Dataset)</option>
+            <!-- Populated via JS -->
+          </select>
+        </div>
+
+        <!-- X-Axis Metric -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">X-Axis</label>
+          <select id="micro-x-axis" onchange="updateMicroChart()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <option value="ev" selected>Exit Velocity (mph)</option>
+            <option value="la">Launch Angle (degrees)</option>
+            <option value="dist">Hit Distance (ft)</option>
+          </select>
+        </div>
+
+        <!-- Y-Axis Metric -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Y-Axis</label>
+          <select id="micro-y-axis" onchange="updateMicroChart()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <option value="dist" selected>Hit Distance (ft)</option>
+            <option value="la">Launch Angle (degrees)</option>
+            <option value="ev">Exit Velocity (mph)</option>
+          </select>
+        </div>
+
+        <!-- Batter Hand -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Batter Stand</label>
+          <select id="micro-stand" onchange="updateMicroChart()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <option value="ALL" selected>All Batters (Lefties &amp; Righties)</option>
+            <option value="L">Left-Handed Batters (L)</option>
+            <option value="R">Right-Handed Batters (R)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Quick Search Player -->
+      <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-800/60 text-xs">
+        <div class="flex items-center space-x-2">
+          <span class="text-slate-400">Search Batter:</span>
+          <input type="text" id="micro-search" placeholder="e.g. Judge, Ohtani, Soto..." oninput="updateMicroChart()" 
+                 class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none w-56">
+        </div>
+        <div class="text-slate-400">
+          Tip: Hover over points to see player names, dates, and match descriptions!
+        </div>
+      </div>
+    </div>
+
+    <!-- Micro Chart Canvas & Stat Summary -->
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div class="lg:col-span-3 glass-card rounded-2xl p-5 border border-slate-800 relative">
+        <div class="h-[520px] w-full">
+          <canvas id="microChartCanvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Micro Side Stats -->
+      <div class="space-y-4">
+        <div class="glass-card rounded-2xl p-5 border border-slate-800">
+          <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Batted Ball Summary</div>
+          <div class="space-y-3 font-mono text-xs">
+            <div>
+              <div class="text-slate-400 font-sans text-xs">Max Home Run Distance</div>
+              <div class="text-xl font-bold text-emerald-400" id="hr-stat-max-dist">--</div>
+            </div>
+            <div class="pt-2 border-t border-slate-800">
+              <div class="text-slate-400 font-sans text-xs">Shortest "Wall Scraper" HR</div>
+              <div class="text-xl font-bold text-amber-400" id="hr-stat-min-dist">--</div>
+            </div>
+            <div class="pt-2 border-t border-slate-800">
+              <div class="text-slate-400 font-sans text-xs">Max Exit Velocity</div>
+              <div class="text-xl font-bold text-red-400" id="hr-stat-max-ev">--</div>
+            </div>
+            <div class="pt-2 border-t border-slate-800">
+              <div class="text-slate-400 font-sans text-xs">Optimal Launch Angle Range</div>
+              <div class="text-base font-bold text-blue-400">24° – 32°</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card rounded-2xl p-5 border border-slate-800" id="hr-detail-card">
+          <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Home Run Inspector</div>
+          <div id="hr-detail-empty" class="text-xs text-slate-400 italic">Hover any home run dot to inspect pitch speed, batter, launch details, and ballpark.</div>
+          <div id="hr-detail-content" class="hidden space-y-2 text-xs">
+            <div class="font-bold text-white text-sm" id="hr-player"></div>
+            <div class="text-slate-400" id="hr-game-info"></div>
+            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 font-mono text-[11px]">
+              <div>Exit Velo: <span id="hr-ev" class="text-emerald-400 font-bold"></span></div>
+              <div>Distance: <span id="hr-dist" class="text-blue-400 font-bold"></span></div>
+              <div>Launch Angle: <span id="hr-la" class="text-purple-400 font-bold"></span></div>
+              <div>Pitch Velo: <span id="hr-pitch" class="text-slate-300"></span></div>
+            </div>
+            <p id="hr-des" class="text-[11px] text-slate-300 italic pt-1 border-t border-slate-800/60"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- VIEW 3: STADIUM RANKINGS & DIMENSION PROFILES -->
+  <main id="view-rankings" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6 hidden">
+    <div class="glass-card rounded-2xl p-5 border border-slate-800">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+        <div>
+          <h2 class="text-lg font-bold text-white">MLB Ballpark Home Run Factor Leaderboard</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Ranked by Statcast Home Run Factor (100 = MLB Average). Includes left/right splits and outfield physical parameters.</p>
+        </div>
+        <div class="flex items-center space-x-2 text-xs">
+          <span class="px-2 py-1 rounded bg-red-500/20 text-red-400 border border-red-500/30 font-semibold">HR Friendly (>105)</span>
+          <span class="px-2 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700">Neutral (95-105)</span>
+          <span class="px-2 py-1 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold">Pitcher Friendly (<95)</span>
+        </div>
+      </div>
+
+      <!-- Grid of Cards -->
+      <div id="stadium-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Populated via JS -->
+      </div>
+    </div>
+  </main>
+
+  <!-- VIEW 4: DATA TABLE & EXPORT -->
+  <main id="view-table" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6 hidden">
+    <div class="glass-card rounded-2xl p-5 border border-slate-800">
+      <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800 mb-4">
+        <div>
+          <h2 class="text-lg font-bold text-white">Full Ballpark Dimensions &amp; Factors Dataset</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Browse all 810 ballpark-season-split observations directly scraped from MLB Baseball Savant.</p>
+        </div>
+        <div class="flex items-center space-x-3">
+          <input type="text" id="table-search" placeholder="Search table..." oninput="filterTable()" 
+                 class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:ring-2 focus:ring-blue-500 focus:outline-none w-48">
+          <button onclick="exportToCSV()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            <span>Export CSV</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Responsive Table Container -->
+      <div class="overflow-x-auto rounded-xl border border-slate-800 max-h-[600px] overflow-y-auto">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead class="bg-slate-900/90 text-slate-300 uppercase tracking-wider sticky top-0 z-10 font-mono text-[11px] border-b border-slate-800">
+            <tr>
+              <th class="p-3">Ballpark</th>
+              <th class="p-3">Team</th>
+              <th class="p-3">Year</th>
+              <th class="p-3">Split</th>
+              <th class="p-3 text-right">HR Index</th>
+              <th class="p-3 text-right">Runs Index</th>
+              <th class="p-3 text-right">Avg Fence (ft)</th>
+              <th class="p-3 text-right">CF (ft)</th>
+              <th class="p-3 text-right">LF Line (ft)</th>
+              <th class="p-3 text-right">RF Line (ft)</th>
+              <th class="p-3 text-right">Fence Area</th>
+              <th class="p-3 text-right">Elevation (ft)</th>
+            </tr>
+          </thead>
+          <tbody id="table-body" class="divide-y divide-slate-800/60 font-mono">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="mt-auto border-t border-slate-800/80 bg-slate-950/80 py-8 text-xs text-slate-400">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-center space-x-2">
+        <span>Data verified against</span>
+        <a href="https://baseballsavant.mlb.com/leaderboard/statcast-park-factors?type=dimensions&year=2026" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">
+          MLB Baseball Savant Statcast Park Factors &amp; Dimensions
+        </a>
+      </div>
+      <div>
+        <span>Built with HTML5, Chart.js, Tailwind CSS &amp; Statcast Search API</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Load Embedded Data Script -->
+  <script src="data.js"></script>
+
+  <!-- Application Logic -->
+  <script>
+    // Global references
+    let macroChart = null;
+    let microChart = null;
+
+    // View Switcher
+    function switchView(viewName) {
+      const views = ['macro', 'micro', 'rankings', 'table'];
+      views.forEach(v => {
+        const el = document.getElementById(`view-${v}`);
+        const btn = document.getElementById(`tab-btn-${v}`);
+        if (v === viewName) {
+          el.classList.remove('hidden');
+          btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center space-x-2 bg-blue-600 text-white shadow-lg shadow-blue-600/30";
+        } else {
+          el.classList.add('hidden');
+          btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-slate-800";
+        }
+      });
+
+      if (viewName === 'macro') {
+        if (!macroChart) initMacroChart();
+        else macroChart.update();
+      } else if (viewName === 'micro') {
+        if (!microChart) initMicroChart();
+        else microChart.update();
+      } else if (viewName === 'rankings') {
+        renderRankings();
+      } else if (viewName === 'table') {
+        renderTable();
+      }
+    }
+
+    // Metric labels for display
+    const METRIC_LABELS = {
+      avg_fence_distance: 'Average Fence Distance (ft)',
+      distance_cf: 'Center Field Distance (ft)',
+      distance_lf_line: 'Left Field Line Distance (ft)',
+      distance_rf_line: 'Right Field Line Distance (ft)',
+      distance_lf_gap: 'Left-Center Gap Distance (ft)',
+      distance_rf_gap: 'Right-Center Gap Distance (ft)',
+      distance_deepest: 'Deepest Outfield Distance (ft)',
+      fence_area: 'Outfield Fence Area (sq ft)',
+      avg_fence_height: 'Average Fence Height (ft)',
+      height_highest: 'Highest Fence Wall (ft)',
+      elevation: 'Elevation (ft)',
+      index_hr: 'Home Run Factor (100 = MLB Avg)',
+      avg_hr_distance: 'Average HR Distance (ft)',
+      index_runs: 'Run Scoring Factor (index_runs)',
+      index_hardhit: 'Hard Hit Factor (index_hardhit)',
+      index_woba: 'wOBA Factor (index_woba)',
+      ev: 'Exit Velocity (mph)',
+      la: 'Launch Angle (degrees)',
+      dist: 'Hit Distance (ft)'
+    };
+
+    // Calculate Linear Regression
+    function calculateRegression(points) {
+      if (!points || points.length < 2) return null;
+      let n = points.length;
+      let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0, sumYY = 0;
+      let minX = Infinity, maxX = -Infinity;
+
+      for (let p of points) {
+        let x = p.x;
+        let y = p.y;
+        sumX += x;
+        sumY += y;
+        sumXY += (x * y);
+        sumXX += (x * x);
+        sumYY += (y * y);
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+      }
+
+      let denom = (n * sumXX - sumX * sumX);
+      if (denom === 0) return null;
+      let slope = (n * sumXY - sumX * sumY) / denom;
+      let intercept = (sumY - slope * sumX) / n;
+
+      let rNumerator = (n * sumXY - sumX * sumY);
+      let rDenom = Math.sqrt((n * sumXX - sumX * sumX) * (n * sumYY - sumY * sumY));
+      let r = rDenom !== 0 ? (rNumerator / rDenom) : 0;
+      let r2 = r * r;
+
+      return {
+        slope,
+        intercept,
+        r,
+        r2,
+        minX,
+        maxX,
+        linePoints: [
+          { x: minX, y: slope * minX + intercept },
+          { x: maxX, y: slope * maxX + intercept }
+        ]
+      };
+    }
+
+    // Initialize Macro Chart
+    function initMacroChart() {
+      const ctx = document.getElementById('macroChartCanvas').getContext('2d');
+      macroChart = new Chart(ctx, {
+        type: 'scatter',
+        data: { datasets: [] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 400 },
+          plugins: {
+            legend: {
+              labels: { color: '#94a3b8', font: { family: 'Inter', size: 12 } }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              titleColor: '#ffffff',
+              bodyColor: '#e2e8f0',
+              borderColor: '#3b82f6',
+              borderWidth: 1,
+              padding: 12,
+              displayColors: false,
+              callbacks: {
+                title: function(items) {
+                  const p = items[0].raw.meta;
+                  return `${p.venue_name} (${p.team}) - ${p.season}`;
+                },
+                label: function(item) {
+                  const p = item.raw.meta;
+                  const xKey = document.getElementById('macro-x-axis').value;
+                  const yKey = document.getElementById('macro-y-axis').value;
+                  return [
+                    `${METRIC_LABELS[xKey]}: ${item.raw.x}`,
+                    `${METRIC_LABELS[yKey]}: ${item.raw.y}`,
+                    `Split: ${p.split} | League: ${p.league}`,
+                    `CF: ${p.distance_cf} ft | LF: ${p.distance_lf_line} ft | RF: ${p.distance_rf_line} ft`,
+                    `Fence Area: ${p.fence_area.toLocaleString()} sq ft | Elev: ${p.elevation} ft`
+                  ];
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(51, 65, 85, 0.3)' },
+              ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 11 } },
+              title: { display: true, text: '', color: '#cbd5e1', font: { family: 'Inter', size: 13, weight: 600 } }
+            },
+            y: {
+              grid: { color: 'rgba(51, 65, 85, 0.3)' },
+              ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 11 } },
+              title: { display: true, text: '', color: '#cbd5e1', font: { family: 'Inter', size: 13, weight: 600 } }
+            }
+          },
+          onHover: (event, elements) => {
+            if (elements && elements.length > 0) {
+              const el = elements[0];
+              const dataset = macroChart.data.datasets[el.datasetIndex];
+              if (dataset && dataset.data && dataset.data[el.index] && dataset.data[el.index].meta) {
+                showMacroDetail(dataset.data[el.index].meta);
+              }
+            }
+          }
+        }
+      });
+      updateMacroChart();
+    }
+
+    // Update Macro Chart Data based on user controls
+    function updateMacroChart() {
+      if (!macroChart || !window.PARK_DATA) return;
+
+      const xKey = document.getElementById('macro-x-axis').value;
+      const yKey = document.getElementById('macro-y-axis').value;
+      const yearFilter = document.getElementById('macro-year').value;
+      const splitFilter = document.getElementById('macro-split').value;
+      const leagueFilter = document.getElementById('macro-league').value;
+      const colorByLeague = document.getElementById('macro-color-league').checked;
+      const showTrend = document.getElementById('macro-show-trend').checked;
+      const searchQuery = document.getElementById('macro-search').value.toLowerCase().trim();
+
+      // Filter data
+      let filtered = window.PARK_DATA.filter(item => {
+        if (yearFilter !== 'ALL' && item.season.toString() !== yearFilter) return false;
+        if (splitFilter !== 'ALL_SPLITS' && item.split !== splitFilter) return false;
+        if (leagueFilter !== 'ALL' && item.league !== leagueFilter) return false;
+        if (searchQuery) {
+          const match = item.venue_name.toLowerCase().includes(searchQuery) ||
+                        item.team.toLowerCase().includes(searchQuery) ||
+                        (item.city && item.city.toLowerCase().includes(searchQuery));
+          if (!match) return false;
+        }
+        return item[xKey] !== undefined && item[yKey] !== undefined;
+      });
+
+      document.getElementById('macro-data-count').innerText = `Showing ${filtered.length} / ${window.PARK_DATA.length} data points`;
+
+      // Extract points
+      const points = filtered.map(item => ({
+        x: item[xKey],
+        y: item[yKey],
+        meta: item
+      }));
+
+      // Calculate regression
+      const reg = calculateRegression(points);
+      if (reg) {
+        document.getElementById('stat-r').innerText = reg.r.toFixed(3);
+        document.getElementById('stat-r2').innerText = reg.r2.toFixed(3);
+        document.getElementById('stat-r').className = `text-2xl font-bold font-mono ${Math.abs(reg.r) > 0.4 ? 'text-emerald-400' : 'text-blue-400'}`;
+        
+        let desc = 'Weak Correlation';
+        if (Math.abs(reg.r) > 0.6) desc = 'Strong Correlation';
+        else if (Math.abs(reg.r) > 0.35) desc = 'Moderate Correlation';
+        document.getElementById('stat-r-desc').innerText = `${reg.r < 0 ? 'Inverse' : 'Positive'} ${desc}`;
+        document.getElementById('stat-r2-desc').innerText = `${(reg.r2 * 100).toFixed(1)}% of variance explained`;
+        
+        const sign = reg.intercept >= 0 ? '+' : '-';
+        document.getElementById('stat-eq').innerText = `y = ${reg.slope.toFixed(3)}x ${sign} ${Math.abs(reg.intercept).toFixed(2)}`;
+      } else {
+        document.getElementById('stat-r').innerText = '--';
+        document.getElementById('stat-r2').innerText = '--';
+        document.getElementById('stat-eq').innerText = 'N/A';
+      }
+
+      // Build datasets
+      const datasets = [];
+
+      if (colorByLeague) {
+        const alPoints = points.filter(p => p.meta.league === 'AL');
+        const nlPoints = points.filter(p => p.meta.league === 'NL');
+        datasets.push({
+          label: 'American League (AL)',
+          data: alPoints,
+          backgroundColor: 'rgba(59, 130, 246, 0.85)',
+          borderColor: '#1d4ed8',
+          borderWidth: 1.5,
+          pointRadius: 6,
+          pointHoverRadius: 9
+        });
+        datasets.push({
+          label: 'National League (NL)',
+          data: nlPoints,
+          backgroundColor: 'rgba(239, 68, 68, 0.85)',
+          borderColor: '#b91c1c',
+          borderWidth: 1.5,
+          pointRadius: 6,
+          pointHoverRadius: 9
+        });
+      } else {
+        datasets.push({
+          label: 'MLB Ballparks',
+          data: points,
+          backgroundColor: points.map(p => p.meta.color || '#3b82f6'),
+          borderColor: '#ffffff',
+          borderWidth: 1,
+          pointRadius: 6,
+          pointHoverRadius: 9
+        });
+      }
+
+      // Add Trendline Dataset
+      if (showTrend && reg && reg.linePoints) {
+        datasets.push({
+          label: `Trendline (R² = ${reg.r2.toFixed(3)})`,
+          data: reg.linePoints,
+          type: 'line',
+          borderColor: '#10b981',
+          borderWidth: 2.5,
+          borderDash: [6, 4],
+          fill: false,
+          pointRadius: 0,
+          tension: 0
+        });
+      }
+
+      macroChart.data.datasets = datasets;
+      macroChart.options.scales.x.title.text = METRIC_LABELS[xKey] || xKey;
+      macroChart.options.scales.y.title.text = METRIC_LABELS[yKey] || yKey;
+      macroChart.update();
+    }
+
+    // Show Ballpark detail in side panel
+    function showMacroDetail(meta) {
+      document.getElementById('detail-empty').classList.add('hidden');
+      const content = document.getElementById('detail-content');
+      content.classList.remove('hidden');
+
+      document.getElementById('detail-dot').style.backgroundColor = meta.color || '#3b82f6';
+      document.getElementById('detail-name').innerText = meta.venue_name;
+      document.getElementById('detail-team-city').innerText = `${meta.team} • ${meta.city || meta.league} • ${meta.season} (${meta.split})`;
+      document.getElementById('detail-hr').innerText = `${meta.index_hr} (${meta.index_hr >= 100 ? '+' : ''}${meta.index_hr - 100}%)`;
+      document.getElementById('detail-hr').className = meta.index_hr > 105 ? 'text-red-400 font-bold' : (meta.index_hr < 95 ? 'text-blue-400 font-bold' : 'text-slate-300 font-bold');
+      document.getElementById('detail-runs').innerText = meta.index_runs;
+      document.getElementById('detail-fence').innerText = `${meta.avg_fence_distance} ft`;
+      document.getElementById('detail-hr-dist').innerText = `${meta.avg_hr_distance} ft`;
+      document.getElementById('detail-cf').innerText = `${meta.distance_cf} ft`;
+      document.getElementById('detail-area').innerText = `${meta.fence_area.toLocaleString()} sq ft`;
+      document.getElementById('detail-wall').innerText = `${meta.height_highest} ft`;
+      document.getElementById('detail-elev').innerText = `${meta.elevation} ft`;
+    }
+
+    // Initialize Micro Chart (Statcast Individual HRs)
+    function initMicroChart() {
+      // Populate stadium select
+      const select = document.getElementById('micro-stadium');
+      const uniqueStadiums = [...new Set(window.STATCAST_HRS.map(h => h.stadium))].sort();
+      uniqueStadiums.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.innerText = s;
+        select.appendChild(opt);
+      });
+
+      const ctx = document.getElementById('microChartCanvas').getContext('2d');
+      microChart = new Chart(ctx, {
+        type: 'scatter',
+        data: { datasets: [] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 300 },
+          plugins: {
+            legend: {
+              labels: { color: '#94a3b8', font: { family: 'Inter', size: 12 } }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              titleColor: '#ffffff',
+              bodyColor: '#e2e8f0',
+              borderColor: '#10b981',
+              borderWidth: 1,
+              padding: 12,
+              callbacks: {
+                title: items => items[0].raw.meta.player,
+                label: item => {
+                  const m = item.raw.meta;
+                  return [
+                    `Stadium: ${m.stadium} (${m.team})`,
+                    `Exit Velo: ${m.ev} mph | Distance: ${m.dist} ft`,
+                    `Launch Angle: ${m.la}° | Date: ${m.date}`,
+                    m.des || ''
+                  ];
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(51, 65, 85, 0.3)' },
+              ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 11 } },
+              title: { display: true, text: '', color: '#cbd5e1', font: { family: 'Inter', size: 13, weight: 600 } }
+            },
+            y: {
+              grid: { color: 'rgba(51, 65, 85, 0.3)' },
+              ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 11 } },
+              title: { display: true, text: '', color: '#cbd5e1', font: { family: 'Inter', size: 13, weight: 600 } }
+            }
+          },
+          onHover: (event, elements) => {
+            if (elements && elements.length > 0) {
+              const el = elements[0];
+              const dataset = microChart.data.datasets[el.datasetIndex];
+              if (dataset && dataset.data && dataset.data[el.index] && dataset.data[el.index].meta) {
+                showMicroDetail(dataset.data[el.index].meta);
+              }
+            }
+          }
+        }
+      });
+      updateMicroChart();
+    }
+
+    // Update Micro Chart
+    function updateMicroChart() {
+      if (!microChart || !window.STATCAST_HRS) return;
+
+      const stadiumFilter = document.getElementById('micro-stadium').value;
+      const xKey = document.getElementById('micro-x-axis').value;
+      const yKey = document.getElementById('micro-y-axis').value;
+      const standFilter = document.getElementById('micro-stand').value;
+      const searchQuery = document.getElementById('micro-search').value.toLowerCase().trim();
+
+      let filtered = window.STATCAST_HRS.filter(hr => {
+        if (stadiumFilter !== 'ALL' && hr.stadium !== stadiumFilter) return false;
+        if (standFilter !== 'ALL' && hr.stand !== standFilter) return false;
+        if (searchQuery && !hr.player.toLowerCase().includes(searchQuery)) return false;
+        return true;
+      });
+
+      document.getElementById('micro-data-count').innerText = `Displaying ${filtered.length.toLocaleString()} home runs`;
+
+      // Calculate min, max stats
+      if (filtered.length > 0) {
+        let maxDist = 0, minDist = Infinity, maxEV = 0;
+        let maxDistPlayer = '', minDistPlayer = '', maxEVPlayer = '';
+        for (let h of filtered) {
+          if (h.dist > maxDist) { maxDist = h.dist; maxDistPlayer = h.player; }
+          if (h.dist < minDist) { minDist = h.dist; minDistPlayer = h.player; }
+          if (h.ev > maxEV) { maxEV = h.ev; maxEVPlayer = h.player; }
+        }
+        document.getElementById('hr-stat-max-dist').innerText = `${maxDist} ft (${maxDistPlayer.split(',')[0]})`;
+        document.getElementById('hr-stat-min-dist').innerText = `${minDist} ft (${minDistPlayer.split(',')[0]})`;
+        document.getElementById('hr-stat-max-ev').innerText = `${maxEV} mph (${maxEVPlayer.split(',')[0]})`;
+      }
+
+      const points = filtered.map(hr => ({
+        x: hr[xKey],
+        y: hr[yKey],
+        meta: hr
+      }));
+
+      microChart.data.datasets = [{
+        label: stadiumFilter === 'ALL' ? 'All MLB Stadiums' : stadiumFilter,
+        data: points,
+        backgroundColor: points.map(p => p.meta.color || '#10b981'),
+        borderColor: 'rgba(255, 255, 255, 0.4)',
+        borderWidth: 0.5,
+        pointRadius: filtered.length > 1500 ? 3 : 5,
+        pointHoverRadius: 8
+      }];
+
+      microChart.options.scales.x.title.text = METRIC_LABELS[xKey] || xKey;
+      microChart.options.scales.y.title.text = METRIC_LABELS[yKey] || yKey;
+      microChart.update();
+    }
+
+    // Show single Home Run inspection card
+    function showMicroDetail(m) {
+      document.getElementById('hr-detail-empty').classList.add('hidden');
+      const content = document.getElementById('hr-detail-content');
+      content.classList.remove('hidden');
+
+      document.getElementById('hr-player').innerText = m.player;
+      document.getElementById('hr-game-info').innerText = `${m.stadium} • ${m.date} • ${m.stand === 'L' ? 'Left-handed' : 'Right-handed'} batter`;
+      document.getElementById('hr-ev').innerText = `${m.ev} mph`;
+      document.getElementById('hr-dist').innerText = `${m.dist} ft`;
+      document.getElementById('hr-la').innerText = `${m.la}°`;
+      document.getElementById('hr-pitch').innerText = m.pitch_speed ? `${m.pitch_speed} mph` : 'N/A';
+      document.getElementById('hr-des').innerText = m.des || '';
+    }
+
+    // Render Stadium Rankings View
+    function renderRankings() {
+      const grid = document.getElementById('stadium-grid');
+      if (grid.children.length > 0) return; // already rendered
+
+      // Take latest 2026 or 2024 records for All split
+      const latestParks = window.PARK_DATA.filter(p => p.season === 2026 && p.split === 'All');
+      // Sort by index_hr descending
+      latestParks.sort((a, b) => b.index_hr - a.index_hr);
+
+      grid.innerHTML = latestParks.map((p, idx) => {
+        const hrColor = p.index_hr > 105 ? 'text-red-400 bg-red-500/10 border-red-500/30' : 
+                       (p.index_hr < 95 ? 'text-blue-400 bg-blue-500/10 border-blue-500/30' : 'text-slate-300 bg-slate-800 border-slate-700');
+        const badgeText = p.index_hr > 105 ? 'HR Friendly' : (p.index_hr < 95 ? 'Pitcher Friendly' : 'Neutral');
+        
+        return `
+          <div class="glass-card rounded-xl p-4 border border-slate-800 glass-card-hover transition space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2.5">
+                <span class="w-6 h-6 rounded-lg bg-slate-800 flex items-center justify-center font-mono font-bold text-xs text-slate-300">#${idx + 1}</span>
+                <div>
+                  <h3 class="font-bold text-white text-sm leading-tight">${p.venue_name}</h3>
+                  <p class="text-xs text-slate-400">${p.team} • ${p.league} • ${p.city || ''}</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-lg font-bold font-mono ${p.index_hr > 105 ? 'text-red-400' : (p.index_hr < 95 ? 'text-blue-400' : 'text-slate-200')}">${p.index_hr}</div>
+                <span class="text-[10px] px-2 py-0.5 rounded border font-semibold ${hrColor}">${badgeText}</span>
+              </div>
+            </div>
+
+            <!-- Outfield Dimensions Profile Bar -->
+            <div class="grid grid-cols-4 gap-1.5 text-center font-mono text-[11px] pt-2 border-t border-slate-800/80">
+              <div class="bg-slate-900/80 p-1.5 rounded">
+                <div class="text-[10px] text-slate-400 font-sans">LF Line</div>
+                <div class="font-bold text-slate-200">${p.distance_lf_line}'</div>
+              </div>
+              <div class="bg-slate-900/80 p-1.5 rounded">
+                <div class="text-[10px] text-slate-400 font-sans">Center</div>
+                <div class="font-bold text-slate-200">${p.distance_cf}'</div>
+              </div>
+              <div class="bg-slate-900/80 p-1.5 rounded">
+                <div class="text-[10px] text-slate-400 font-sans">RF Line</div>
+                <div class="font-bold text-slate-200">${p.distance_rf_line}'</div>
+              </div>
+              <div class="bg-slate-900/80 p-1.5 rounded">
+                <div class="text-[10px] text-slate-400 font-sans">Max Wall</div>
+                <div class="font-bold text-purple-300">${p.height_highest}'</div>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+              <span>Avg Fence: <strong class="text-slate-200 font-mono">${p.avg_fence_distance} ft</strong></span>
+              <span>Elevation: <strong class="text-slate-200 font-mono">${p.elevation} ft</strong></span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Render Data Table View
+    function renderTable() {
+      const tbody = document.getElementById('table-body');
+      if (tbody.children.length > 0) return;
+
+      tbody.innerHTML = window.PARK_DATA.slice(0, 150).map(p => `
+        <tr class="hover:bg-slate-800/40 transition">
+          <td class="p-3 text-white font-sans font-semibold">${p.venue_name}</td>
+          <td class="p-3 text-slate-300 font-sans">${p.team}</td>
+          <td class="p-3 text-slate-400">${p.season}</td>
+          <td class="p-3 text-blue-400">${p.split}</td>
+          <td class="p-3 text-right font-bold ${p.index_hr > 105 ? 'text-red-400' : (p.index_hr < 95 ? 'text-blue-400' : 'text-slate-300')}">${p.index_hr}</td>
+          <td class="p-3 text-right text-slate-300">${p.index_runs}</td>
+          <td class="p-3 text-right text-slate-300">${p.avg_fence_distance}</td>
+          <td class="p-3 text-right text-slate-300">${p.distance_cf}</td>
+          <td class="p-3 text-right text-slate-300">${p.distance_lf_line}</td>
+          <td class="p-3 text-right text-slate-300">${p.distance_rf_line}</td>
+          <td class="p-3 text-right text-slate-400">${p.fence_area.toLocaleString()}</td>
+          <td class="p-3 text-right text-slate-400">${p.elevation}</td>
+        </tr>
+      `).join('');
+    }
+
+    function filterTable() {
+      const query = document.getElementById('table-search').value.toLowerCase().trim();
+      const filtered = window.PARK_DATA.filter(p => 
+        p.venue_name.toLowerCase().includes(query) ||
+        p.team.toLowerCase().includes(query) ||
+        p.season.toString().includes(query) ||
+        p.split.toLowerCase().includes(query)
+      );
+
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = filtered.slice(0, 150).map(p => `
+        <tr class="hover:bg-slate-800/40 transition">
+          <td class="p-3 text-white font-sans font-semibold">${p.venue_name}</td>
+          <td class="p-3 text-slate-300 font-sans">${p.team}</td>
+          <td class="p-3 text-slate-400">${p.season}</td>
+          <td class="p-3 text-blue-400">${p.split}</td>
+          <td class="p-3 text-right font-bold ${p.index_hr > 105 ? 'text-red-400' : (p.index_hr < 95 ? 'text-blue-400' : 'text-slate-300')}">${p.index_hr}</td>
+          <td class="p-3 text-right text-slate-300">${p.index_runs}</td>
+          <td class="p-3 text-right text-slate-300">${p.avg_fence_distance}</td>
+          <td class="p-3 text-right text-slate-300">${p.distance_cf}</td>
+          <td class="p-3 text-right text-slate-300">${p.distance_lf_line}</td>
+          <td class="p-3 text-right text-slate-300">${p.distance_rf_line}</td>
+          <td class="p-3 text-right text-slate-400">${p.fence_area.toLocaleString()}</td>
+          <td class="p-3 text-right text-slate-400">${p.elevation}</td>
+        </tr>
+      `).join('');
+    }
+
+    // CSV Export
+    function exportToCSV() {
+      if (!window.PARK_DATA) return;
+      const headers = ['venue_name', 'team', 'season', 'split', 'index_hr', 'index_runs', 'avg_fence_distance', 'distance_cf', 'distance_lf_line', 'distance_rf_line', 'fence_area', 'elevation'];
+      const csvRows = [headers.join(',')];
+
+      for (let row of window.PARK_DATA) {
+        csvRows.push(headers.map(h => `"${row[h] || ''}"`).join(','));
+      }
+
+      const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', 'mlb_ballpark_dimensions_factors.csv');
+      a.click();
+    }
+
+    // Bootstrapping
+    window.addEventListener('DOMContentLoaded', () => {
+      initMacroChart();
+    });
+  </script>
+</body>
+</html>
