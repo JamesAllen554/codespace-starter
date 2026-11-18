@@ -1,1 +1,1 @@
-Sitemap: https://JamesAllen554.github.io/mlb-ballparks/sitemap.xml
+Sitemap: https://JamesAllen554.github.io/codespace-starter/sitemap.xml
